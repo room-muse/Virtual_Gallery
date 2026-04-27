@@ -7,11 +7,8 @@ A browser-based virtual gallery that lets you upload a room photo, calibrate rea
 **Requirements:** Python 3 (any version — no packages needed).
 
 ```bash
-# 1. Unzip
-unzip roommuse-gallery.zip
-cd roommuse-gallery
 
-# 2. Launch
+# Launch
 python serve.py
 ```
 
