@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>RoomMuse — Virtual Gallery</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
 <style>
   :root{--bg:#0e0f13;--panel:#15171d;--line:#262932;--ink:#eef0f4;--mut:#8b90a0;--teal:#4ed4c4;--accent:#f7b267}
   *{box-sizing:border-box}
@@ -35,6 +36,8 @@
   .handle{position:absolute;width:16px;height:16px;background:var(--teal);border:2px solid #07221f;border-radius:50%;transform:translate(-50%,-50%);cursor:grab;touch-action:none;z-index:5}
   .handle.ref{background:var(--accent)}
   svg.overlay{position:absolute;inset:0;pointer-events:none;width:100%;height:100%}
+  .drag-guide{stroke:var(--teal);stroke-width:1.5;stroke-dasharray:6 4;opacity:.95}
+  .drag-guide-label{fill:var(--teal);font-size:11px;font-weight:600;paint-order:stroke;stroke:#07080b;stroke-width:3;stroke-linejoin:round}
   .toolbar{position:absolute;top:12px;left:12px;display:flex;gap:8px;z-index:50}
   .btn{padding:8px 14px;border:1px solid var(--line);background:rgba(21,23,29,.92);color:var(--ink);border-radius:8px;cursor:pointer;font-size:12px;font-weight:500}
   .btn.primary{background:var(--teal);color:#07221f;border-color:var(--teal)}
@@ -214,6 +217,44 @@ function addHandle(p,i,kind){
 }
 function updateWallPoly(){document.getElementById("wpoly").setAttribute("points",S.wall.map(p=>p.x+","+p.y).join(" "))}
 function setStatus(html){statusEl.style.display="block";statusEl.innerHTML=html}
+function getWallBounds(){
+  if(!S.wall||!S.wall.length)return null;
+  const xs=S.wall.map(p=>p.x),ys=S.wall.map(p=>p.y);
+  return{L:Math.min(...xs),R:Math.max(...xs),T:Math.min(...ys),B:Math.max(...ys)};
+}
+function pxToCm(px){return S.pxPerM?(px/S.pxPerM)*100:0}
+function fmtCm(px){return `${Math.max(0,pxToCm(px)).toFixed(1)} cm`}
+function clearDragGuides(){
+  const g=document.getElementById("dragGuides");
+  if(g)g.remove();
+}
+function updateDragGuides(el){
+  const wall=getWallBounds(),svg=document.querySelector("svg.overlay");
+  if(!wall||!svg||!el)return;
+  const left=parseFloat(el.style.left)||0,top=parseFloat(el.style.top)||0;
+  const w=el.offsetWidth,h=el.offsetHeight;
+  const artL=left,artR=left+w,artT=top,artB=top+h;
+  const cx=left+w/2,cy=top+h/2;
+  const yLine=Math.max(wall.T,Math.min(wall.B,cy));
+  const xLine=Math.max(wall.L,Math.min(wall.R,cx));
+  const leftD=artL-wall.L,rightD=wall.R-artR,topD=artT-wall.T,bottomD=wall.B-artB;
+  let g=document.getElementById("dragGuides");
+  if(!g){
+    g=document.createElementNS("http://www.w3.org/2000/svg","g");
+    g.id="dragGuides";
+    svg.appendChild(g);
+  }
+  g.innerHTML=`
+    <line class="drag-guide" x1="${wall.L}" y1="${yLine}" x2="${artL}" y2="${yLine}"></line>
+    <text class="drag-guide-label" x="${(wall.L+artL)/2}" y="${yLine-6}" text-anchor="middle">${fmtCm(leftD)}</text>
+    <line class="drag-guide" x1="${artR}" y1="${yLine}" x2="${wall.R}" y2="${yLine}"></line>
+    <text class="drag-guide-label" x="${(artR+wall.R)/2}" y="${yLine-6}" text-anchor="middle">${fmtCm(rightD)}</text>
+    <line class="drag-guide" x1="${xLine}" y1="${wall.T}" x2="${xLine}" y2="${artT}"></line>
+    <text class="drag-guide-label" x="${xLine+6}" y="${(wall.T+artT)/2}" dominant-baseline="middle">${fmtCm(topD)}</text>
+    <line class="drag-guide" x1="${xLine}" y1="${artB}" x2="${xLine}" y2="${wall.B}"></line>
+    <text class="drag-guide-label" x="${xLine+6}" y="${(artB+wall.B)/2}" dominant-baseline="middle">${fmtCm(bottomD)}</text>
+  `;
+}
 
 bReset.onclick=()=>{S.photo=S.wall=S.pxPerM=null;S.placed=[];currentPlaced=null;info.classList.remove("open");showDrop()};
 
@@ -279,21 +320,28 @@ function pickArt(id,opts={}){
   d.style.transform=`rotate(${getWallAngle()}rad)`;
   d.style.background=a.src?`center/cover no-repeat url(${a.src})`:`linear-gradient(135deg,${a.c1},${a.c2})`;
   // drag + tap-to-open
-  let sx,sy,ox,oy,moved;
+  let sx,sy,ox,oy,moved,dragging=false;
   d.addEventListener("pointerdown",e=>{
     e.preventDefault();e.stopPropagation();d.setPointerCapture(e.pointerId);
     // bring to front
     document.querySelectorAll(".placed").forEach(p=>p.style.zIndex=3);
     d.style.zIndex=4;
     sx=e.clientX;sy=e.clientY;ox=parseFloat(d.style.left);oy=parseFloat(d.style.top);moved=false;
+    dragging=true;
+    updateDragGuides(d);
   });
   d.addEventListener("pointermove",e=>{
-    if(e.buttons===0)return;
+    if(!dragging)return;
     const dx=e.clientX-sx,dy=e.clientY-sy;
     if(Math.abs(dx)+Math.abs(dy)>4)moved=true;
     d.style.left=(ox+dx)+"px";d.style.top=(oy+dy)+"px";
+    updateDragGuides(d);
   });
-  d.addEventListener("pointerup",e=>{if(!moved)openInfo(a,d)});
+  d.addEventListener("pointerup",e=>{
+    dragging=false;
+    clearDragGuides();
+    if(!moved)openInfo(a,d);
+  });
   stage.appendChild(d);
   S.placed.push({el:d,art:a});
   openInfo(a,d);
