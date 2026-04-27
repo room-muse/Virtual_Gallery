@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RoomMuse — Virtual Gallery</title>
+<style>
+  :root{--bg:#0e0f13;--panel:#15171d;--line:#262932;--ink:#eef0f4;--mut:#8b90a0;--teal:#4ed4c4;--accent:#f7b267}
+  *{box-sizing:border-box}
+  body{margin:0;font:14px/1.5 -apple-system,system-ui,sans-serif;background:var(--bg);color:var(--ink)}
+  header{padding:14px 22px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:14px}
+  header h1{margin:0;font-size:17px;font-weight:600;letter-spacing:.3px}
+  header h1 span{color:var(--teal)}
+  header .url{color:var(--mut);font-family:ui-monospace,monospace;font-size:12px}
+  .app{display:grid;grid-template-columns:300px 1fr;height:calc(100vh - 52px)}
+  aside{border-right:1px solid var(--line);background:var(--panel);overflow-y:auto;padding:16px}
+  aside h2{font-size:11px;text-transform:uppercase;letter-spacing:1.2px;color:var(--mut);margin:18px 0 8px}
+  aside h2:first-child{margin-top:0}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{padding:5px 10px;border:1px solid var(--line);border-radius:999px;font-size:12px;cursor:pointer;background:transparent;color:var(--ink)}
+  .chip.on{background:var(--teal);border-color:var(--teal);color:#07221f}
+  .range{width:100%}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+  .card{background:#1c1f27;border:1px solid var(--line);border-radius:8px;padding:8px;cursor:pointer;transition:.15s}
+  .card:hover{border-color:var(--teal)}
+  .card .sw{width:100%;aspect-ratio:1;border-radius:4px;margin-bottom:6px}
+  .card .t{font-size:12px;font-weight:600;line-height:1.3}
+  .card .d{font-size:11px;color:var(--mut);margin-top:2px}
+  main{position:relative;overflow:hidden;background:#07080b;display:flex;align-items:center;justify-content:center}
+  #stage{position:relative;max-width:100%;max-height:100%;display:inline-block}
+  #stage img#room{display:block;max-width:100%;max-height:calc(100vh - 80px);user-select:none;-webkit-user-drag:none}
+  .dropzone{border:2px dashed #333845;border-radius:14px;padding:60px 80px;text-align:center;color:var(--mut);cursor:pointer}
+  .dropzone:hover{border-color:var(--teal);color:var(--ink)}
+  .dropzone b{color:var(--ink);font-size:16px;display:block;margin-bottom:6px}
+  .handle{position:absolute;width:16px;height:16px;background:var(--teal);border:2px solid #07221f;border-radius:50%;transform:translate(-50%,-50%);cursor:grab;touch-action:none;z-index:5}
+  .handle.ref{background:var(--accent)}
+  svg.overlay{position:absolute;inset:0;pointer-events:none;width:100%;height:100%}
+  .toolbar{position:absolute;top:12px;left:12px;display:flex;gap:8px;z-index:50}
+  .btn{padding:8px 14px;border:1px solid var(--line);background:rgba(21,23,29,.92);color:var(--ink);border-radius:8px;cursor:pointer;font-size:12px;font-weight:500}
+  .btn.primary{background:var(--teal);color:#07221f;border-color:var(--teal)}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .status{position:absolute;bottom:12px;left:12px;right:12px;background:rgba(21,23,29,.92);border:1px solid var(--line);padding:10px 14px;border-radius:8px;font-size:12px;color:var(--mut);z-index:10}
+  .status b{color:var(--teal)}
+  .placed{position:absolute;box-shadow:0 18px 50px rgba(0,0,0,.55),0 0 0 3px #2a2016;border:6px solid #3a2c1c;background:#eee;cursor:grab;z-index:3;transition:border-color .15s;touch-action:none;user-select:none}
+  .placed:active{cursor:grabbing}
+  .placed:hover{outline:2px solid var(--teal);outline-offset:2px}
+  .info{position:absolute;top:0;right:0;height:100%;width:300px;background:var(--panel);border-left:1px solid var(--line);padding:22px;transform:translateX(100%);transition:.25s;z-index:20;overflow-y:auto}
+  .info.open{transform:none}
+  .info .x{position:absolute;top:14px;right:14px;background:none;border:none;color:var(--mut);font-size:22px;cursor:pointer}
+  .info h3{margin:0 0 4px;font-size:20px}
+  .info .g{color:var(--mut);font-size:12px;margin-bottom:18px}
+  .dims{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin:18px 0;padding:14px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .dims div{text-align:center}
+  .dims b{display:block;font-size:18px;color:var(--teal)}
+  .dims span{font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.8px}
+  .price{font-size:26px;font-weight:700;margin:10px 0 18px}
+  .info .btn{width:100%;margin-top:8px}
+  dialog{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:22px;min-width:320px}
+  dialog::backdrop{background:rgba(0,0,0,.6)}
+  dialog h3{margin:0 0 6px}
+  dialog p{color:var(--mut);font-size:12px;margin:0 0 14px}
+  dialog input{width:100%;padding:10px;background:#0e0f13;border:1px solid var(--line);border-radius:6px;color:var(--ink);font-size:14px;margin-bottom:14px}
+  dialog .row{display:flex;gap:8px;justify-content:flex-end}
+</style>
+</head>
+<body>
+<header>
+  <h1>Room<span>Muse</span> — Virtual Gallery</h1>
+  <span class="url">roommuse.app/gallery</span>
+</header>
+<div class="app">
+  <aside>
+    <h2>Style</h2><div class="chips" id="fStyle"></div>
+    <h2>Tone</h2><div class="chips" id="fTone"></div>
+    <h2>Size</h2><div class="chips" id="fSize"></div>
+    <h2>Max price: $<span id="pLbl">5000</span></h2>
+    <input type="range" class="range" id="fPrice" min="0" max="5000" step="50" value="5000">
+    <h2>Artworks (<span id="count">0</span>)</h2>
+    <div class="grid" id="list"></div>
+  </aside>
+  <main id="main">
+    <div id="stage"></div>
+    <div class="toolbar" id="toolbar" style="display:none">
+      <button class="btn" id="bReset">↻ New photo</button>
+      <button class="btn primary" id="bCalibrate" disabled>② Calibrate scale</button>
+    </div>
+    <div class="status" id="status" style="display:none"></div>
+    <div class="info" id="info">
+      <button class="x" id="iClose">×</button>
+      <h3 id="iTitle"></h3><div class="g" id="iGallery"></div>
+      <div class="price" id="iPrice"></div>
+      <div class="dims">
+        <div><b id="iW"></b><span>Width</span></div>
+        <div><b id="iH"></b><span>Height</span></div>
+        <div><b id="iS"></b><span>Size</span></div>
+      </div>
+      <button class="btn primary" id="iSwap">Add more artworks →</button>
+      <button class="btn" id="iRemove" style="margin-top:6px">Remove this piece</button>
+      <button class="btn" id="iClear" style="margin-top:6px">Clear all placed</button>
+    </div>
+  </main>
+</div>
+
+<dialog id="calDlg">
+  <h3>Calibrate scale</h3>
+  <p>Drag the orange handles onto a known object (e.g. a door), then enter its real height.</p>
+  <label style="font-size:12px;color:var(--mut)">Real height (cm)</label>
+  <input type="number" id="calCm" value="200" min="1">
+  <div class="row">
+    <button class="btn" id="calCancel">Cancel</button>
+    <button class="btn primary" id="calOk">Set scale</button>
+  </div>
+</dialog>
+<input type="file" id="file" accept="image/*" hidden>
+<input type="file" id="artFile" accept="image/*" multiple hidden>
+<dialog id="artDlg">
+  <h3 id="artDlgTitle">Add your own artwork</h3>
+  <p>Enter the real-world dimensions. For multiple files, the same dimensions apply to all — title is taken from each filename.</p>
+  <label style="font-size:12px;color:var(--mut)">Title (single file only)</label>
+  <input type="text" id="aTitle" placeholder="My artwork">
+  <div style="display:flex;gap:10px">
+    <div style="flex:1"><label style="font-size:12px;color:var(--mut)">Width (cm)</label><input type="number" id="aW" value="60" min="1"></div>
+    <div style="flex:1"><label style="font-size:12px;color:var(--mut)">Height (cm)</label><input type="number" id="aH" value="80" min="1"></div>
+  </div>
+  <label style="font-size:12px;color:var(--mut)">Price ($)</label>
+  <input type="number" id="aPrice" value="0" min="0">
+  <label style="font-size:12px;color:var(--mut);display:flex;align-items:center;gap:6px;margin-top:4px"><input type="checkbox" id="aAutoPlace" checked> Place on wall immediately</label>
+  <div class="row">
+    <button class="btn" id="aCancel">Cancel</button>
+    <button class="btn primary" id="aOk">Add to gallery</button>
+  </div>
+</dialog>
+
+<script>
+// ---------- data ----------
+const ART = [
+  {id:1,t:"Abstract Blue",g:"Nova Gallery",style:"Abstract",tone:"Light",w:120,h:80,price:450,c1:"#6aa6d6",c2:"#1e3a5f"},
+  {id:2,t:"Sage Minimal",g:"Form Studio",style:"Minimal",tone:"Light",w:50,h:70,price:180,c1:"#b8c9b0",c2:"#6a7a62"},
+  {id:3,t:"Modern Arc",g:"Atrium",style:"Modern",tone:"Dark",w:150,h:100,price:1200,c1:"#2b2b30",c2:"#d4a574"},
+  {id:4,t:"Floral Dream",g:"Bloom",style:"Floral",tone:"Light",w:60,h:90,price:620,c1:"#f4c2c2",c2:"#8b5a8f"},
+  {id:5,t:"Dark Horizon",g:"Nova Gallery",style:"Abstract",tone:"Dark",w:180,h:60,price:2400,c1:"#1a1a2e",c2:"#e94560"},
+  {id:6,t:"Neutral Square",g:"Form Studio",style:"Minimal",tone:"Neutral",w:70,h:70,price:320,c1:"#c9b8a1",c2:"#7a6b55"},
+  {id:7,t:"Bold Petals",g:"Bloom",style:"Floral",tone:"Dark",w:100,h:140,price:1800,c1:"#4a1f3a",c2:"#e8a5c0"},
+  {id:8,t:"City Lines",g:"Atrium",style:"Modern",tone:"Neutral",w:90,h:60,price:540,c1:"#8b8b8b",c2:"#2c3e50"},
+];
+const TONES=["Light","Dark","Neutral"],STYLES=["Abstract","Floral","Modern","Minimal"],SIZES=["Small","Medium","Large"];
+const sizeOf=a=>{const A=a.w*a.h;return A<3600?"Small":A<10000?"Medium":"Large"};
+
+// ---------- state ----------
+const S={photo:null,wall:null,pxPerM:null,placed:[],fStyle:null,fTone:null,fSize:null,fPrice:5000,selected:null};
+let currentPlaced=null;
+const statusEl=document.getElementById("status");
+const toolbarEl=document.getElementById("toolbar");
+
+// ---------- filters UI ----------
+const mkChips=(el,items,key)=>{el.innerHTML="";items.forEach(v=>{const b=document.createElement("button");b.className="chip";b.textContent=v;b.onclick=()=>{S[key]=S[key]===v?null:v;[...el.children].forEach(c=>c.classList.toggle("on",c.textContent===S[key]));render()};el.appendChild(b)})};
+mkChips(fStyle,STYLES,"fStyle");mkChips(fTone,TONES,"fTone");mkChips(fSize,SIZES,"fSize");
+fPrice.oninput=e=>{S.fPrice=+e.target.value;pLbl.textContent=S.fPrice;render()};
+
+function render(){
+  const list=ART.filter(a=>(!S.fStyle||a.style===S.fStyle)&&(!S.fTone||a.tone===S.fTone)&&(!S.fSize||sizeOf(a)===S.fSize)&&a.price<=S.fPrice);
+  count.textContent=list.length;
+  const upload=`<div class="card" id="upCard" style="display:flex;align-items:center;justify-content:center;border-style:dashed;min-height:110px;text-align:center;color:var(--teal);font-size:12px;font-weight:600">+ Upload<br>your own</div>`;
+  document.getElementById("list").innerHTML=upload+list.map(a=>`<div class="card" data-id="${a.id}"><div class="sw" style="background:${a.src?`center/cover no-repeat url(${a.src})`:`linear-gradient(135deg,${a.c1},${a.c2})`}"></div><div class="t">${a.t}</div><div class="d">${a.w}×${a.h}cm · $${a.price}</div></div>`).join("");
+  document.getElementById("upCard").onclick=()=>artFile.click();
+  document.querySelectorAll(".card[data-id]").forEach(c=>c.onclick=()=>pickArt(+c.dataset.id));
+}
+render();
+
+// ---------- upload ----------
+const stage=document.getElementById("stage");
+function showDrop(){
+  stage.innerHTML=`<div class="dropzone" id="dz"><b>Drop your room photo</b>or click to upload · JPG/PNG · max 20MB</div>`;
+  const dz=document.getElementById("dz");
+  dz.onclick=()=>file.click();
+  dz.ondragover=e=>{e.preventDefault();dz.style.borderColor="var(--teal)"};
+  dz.ondragleave=()=>dz.style.borderColor="";
+  dz.ondrop=e=>{e.preventDefault();if(e.dataTransfer.files[0])loadFile(e.dataTransfer.files[0])};
+  toolbarEl.style.display="none";statusEl.style.display="none";
+}
+file.onchange=e=>e.target.files[0]&&loadFile(e.target.files[0]);
+function loadFile(f){const r=new FileReader();r.onload=()=>{S.photo=r.result;setupWall()};r.readAsDataURL(f)}
+showDrop();
+
+// ---------- wall selection ----------
+function setupWall(){
+  stage.innerHTML=`<img id="room" src="${S.photo}"><svg class="overlay"><polygon id="wpoly" fill="rgba(78,212,196,.18)" stroke="#4ed4c4" stroke-width="2"></polygon></svg>`;
+  const img=document.getElementById("room");
+  const init=()=>{
+    const w=img.clientWidth,h=img.clientHeight;
+    if(!w||!h){requestAnimationFrame(init);return}
+    S.wall=[{x:w*.2,y:h*.15},{x:w*.8,y:h*.15},{x:w*.8,y:h*.75},{x:w*.2,y:h*.75}];
+    S.wall.forEach((p,i)=>addHandle(p,i,"wall"));
+    updateWallPoly();
+    toolbarEl.style.display="flex";bCalibrate.disabled=false;
+    setStatus("① <b>Drag the 4 teal handles</b> to the corners of the wall, then click <b>Calibrate scale</b>");
+  };
+  if(img.complete)init();else img.addEventListener("load",init,{once:true});
+}
+function addHandle(p,i,kind){
+  const h=document.createElement("div");h.className="handle"+(kind==="ref"?" ref":"");
+  h.style.left=p.x+"px";h.style.top=p.y+"px";h.dataset.i=i;h.dataset.kind=kind;
+  stage.appendChild(h);
+  const move=e=>{
+    const t=e.touches?e.touches[0]:e;
+    const r=document.getElementById("room").getBoundingClientRect();
+    const x=Math.max(0,Math.min(r.width,t.clientX-r.left));
+    const y=Math.max(0,Math.min(r.height,t.clientY-r.top));
+    p.x=x;p.y=y;h.style.left=x+"px";h.style.top=y+"px";
+    if(kind==="wall")updateWallPoly();
+  };
+  const up=()=>{document.removeEventListener("pointermove",move);document.removeEventListener("pointerup",up)};
+  h.addEventListener("pointerdown",e=>{e.preventDefault();document.addEventListener("pointermove",move);document.addEventListener("pointerup",up)});
+}
+function updateWallPoly(){document.getElementById("wpoly").setAttribute("points",S.wall.map(p=>p.x+","+p.y).join(" "))}
+function setStatus(html){statusEl.style.display="block";statusEl.innerHTML=html}
+
+bReset.onclick=()=>{S.photo=S.wall=S.pxPerM=null;S.placed=[];currentPlaced=null;info.classList.remove("open");showDrop()};
+
+// ---------- calibration ----------
+let REF=null;
+bCalibrate.onclick=()=>{
+  const img=document.getElementById("room");
+  REF=[{x:img.clientWidth*.5,y:img.clientHeight*.3},{x:img.clientWidth*.5,y:img.clientHeight*.85}];
+  REF.forEach((p,i)=>addHandle(p,i,"ref"));
+  const svg=document.querySelector("svg.overlay");
+  const line=document.createElementNS("http://www.w3.org/2000/svg","line");
+  line.id="refline";line.setAttribute("stroke","#f7b267");line.setAttribute("stroke-width","2");line.setAttribute("stroke-dasharray","6 4");
+  svg.appendChild(line);updateRefLine();
+  const iv=setInterval(updateRefLine,30);
+  calDlg.addEventListener("close",()=>clearInterval(iv),{once:true});
+  setStatus("② Drag the <b>orange handles</b> onto a known object, then set its real height");
+  calDlg.showModal();
+};
+function updateRefLine(){if(!REF)return;const l=document.getElementById("refline");if(!l)return;l.setAttribute("x1",REF[0].x);l.setAttribute("y1",REF[0].y);l.setAttribute("x2",REF[1].x);l.setAttribute("y2",REF[1].y)}
+calCancel.onclick=()=>{calDlg.close();document.querySelectorAll(".handle.ref,#refline").forEach(n=>n.remove());REF=null};
+calOk.onclick=()=>{
+  const cm=+calCm.value;if(!cm||cm<=0)return;
+  const dx=REF[1].x-REF[0].x,dy=REF[1].y-REF[0].y;
+  const px=Math.hypot(dx,dy);
+  S.pxPerM=px/(cm/100);
+  calDlg.close();
+  document.querySelectorAll(".handle.ref,#refline").forEach(n=>n.remove());REF=null;
+  // hide wall selection UI — calibration done
+  document.querySelectorAll(".handle").forEach(n=>n.style.display="none");
+  const wp=document.getElementById("wpoly");if(wp)wp.style.display="none";
+  setStatus(`③ Scale set: <b>${S.pxPerM.toFixed(0)} px/m</b>. Click any artwork in the sidebar to place it — then drag it around the wall.`);
+};
+
+// ---------- wall angle ----------
+function getWallAngle(){
+  if(!S.wall)return 0;
+  // average angle of the top edge (wall[0]→wall[1]) and bottom edge (wall[3]→wall[2])
+  const topAngle=Math.atan2(S.wall[1].y-S.wall[0].y,S.wall[1].x-S.wall[0].x);
+  const botAngle=Math.atan2(S.wall[2].y-S.wall[3].y,S.wall[2].x-S.wall[3].x);
+  return(topAngle+botAngle)/2;
+}
+
+// ---------- place artwork ----------
+function pickArt(id,opts={}){
+  const a=ART.find(x=>x.id===id);if(!a)return;
+  if(!S.pxPerM){setStatus("⚠ Upload a photo and calibrate scale first");return}
+  S.selected=a;
+  const wPx=(a.w/100)*S.pxPerM,hPx=(a.h/100)*S.pxPerM;
+  // wall bbox + eye-level 57%
+  const xs=S.wall.map(p=>p.x),ys=S.wall.map(p=>p.y);
+  const L=Math.min(...xs),R=Math.max(...xs),T=Math.min(...ys),B=Math.max(...ys);
+  const eyeY=T+(B-T)*.57;
+  // stagger: spread across wall width by index among current placed count
+  const n=S.placed.length,idx=opts.index??n;
+  const total=opts.total??Math.max(n+1,1);
+  const slotW=(R-L)/(total+1);
+  const cx=opts.cx??(L+slotW*(idx+1));
+  const cy=opts.cy??eyeY;
+  const d=document.createElement("div");
+  d.className="placed";
+  d.style.width=wPx+"px";d.style.height=hPx+"px";
+  d.style.left=(cx-wPx/2)+"px";d.style.top=(cy-hPx/2)+"px";
+  d.style.transform=`rotate(${getWallAngle()}rad)`;
+  d.style.background=a.src?`center/cover no-repeat url(${a.src})`:`linear-gradient(135deg,${a.c1},${a.c2})`;
+  // drag + tap-to-open
+  let sx,sy,ox,oy,moved;
+  d.addEventListener("pointerdown",e=>{
+    e.preventDefault();e.stopPropagation();d.setPointerCapture(e.pointerId);
+    // bring to front
+    document.querySelectorAll(".placed").forEach(p=>p.style.zIndex=3);
+    d.style.zIndex=4;
+    sx=e.clientX;sy=e.clientY;ox=parseFloat(d.style.left);oy=parseFloat(d.style.top);moved=false;
+  });
+  d.addEventListener("pointermove",e=>{
+    if(e.buttons===0)return;
+    const dx=e.clientX-sx,dy=e.clientY-sy;
+    if(Math.abs(dx)+Math.abs(dy)>4)moved=true;
+    d.style.left=(ox+dx)+"px";d.style.top=(oy+dy)+"px";
+  });
+  d.addEventListener("pointerup",e=>{if(!moved)openInfo(a,d)});
+  stage.appendChild(d);
+  S.placed.push({el:d,art:a});
+  openInfo(a,d);
+}
+function openInfo(a,d){
+  currentPlaced=d||null;
+  iTitle.textContent=a.t;iGallery.textContent=a.g;iPrice.textContent="$"+a.price.toLocaleString();
+  iW.textContent=a.w+"cm";iH.textContent=a.h+"cm";iS.textContent=sizeOf(a);
+  info.classList.add("open");
+}
+iClose.onclick=()=>info.classList.remove("open");
+iSwap.onclick=()=>{info.classList.remove("open");document.querySelector("aside").scrollTo({top:document.getElementById("list").offsetTop-20,behavior:"smooth"})};
+iRemove.onclick=()=>{
+  if(!currentPlaced)return;
+  S.placed=S.placed.filter(p=>p.el!==currentPlaced);
+  currentPlaced.remove();currentPlaced=null;
+  info.classList.remove("open");
+};
+iClear.onclick=()=>{
+  S.placed.forEach(p=>p.el.remove());S.placed=[];currentPlaced=null;
+  info.classList.remove("open");
+};
+
+// ---------- upload custom artwork ----------
+let pendingFiles=[];
+artFile.onchange=e=>{
+  const files=[...e.target.files];if(!files.length)return;
+  Promise.all(files.map(f=>new Promise(res=>{
+    const r=new FileReader();
+    r.onload=()=>res({src:r.result,name:f.name.replace(/\.[^.]+$/,"")});
+    r.readAsDataURL(f);
+  }))).then(loaded=>{
+    pendingFiles=loaded;
+    artDlgTitle.textContent=loaded.length>1?`Add ${loaded.length} artworks`:"Add your own artwork";
+    aTitle.value=loaded.length===1?loaded[0].name:"";
+    aTitle.disabled=loaded.length>1;
+    artDlg.showModal();
+  });
+  e.target.value="";
+};
+aCancel.onclick=()=>{artDlg.close();pendingFiles=[]};
+aOk.onclick=()=>{
+  const w=+aW.value,h=+aH.value;
+  if(!w||!h||!pendingFiles.length)return;
+  const price=+aPrice.value||0;
+  const autoPlace=aAutoPlace.checked&&S.pxPerM;
+  const added=[];
+  pendingFiles.forEach((f,i)=>{
+    const id=Math.max(0,...ART.map(a=>a.id))+1+i;
+    const title=pendingFiles.length===1?(aTitle.value||f.name||"Untitled"):f.name;
+    const art={id,t:title,g:"Your upload",style:"Modern",tone:"Neutral",w,h,price,src:f.src,c1:"#888",c2:"#444"};
+    ART.unshift(art);added.push(art);
+  });
+  pendingFiles=[];artDlg.close();render();
+  if(autoPlace){
+    const start=S.placed.length;
+    added.forEach((a,i)=>pickArt(a.id,{index:start+i,total:start+added.length}));
+  }
+};
+</script>
+</body>
+</html>
